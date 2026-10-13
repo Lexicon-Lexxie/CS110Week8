@@ -19,7 +19,6 @@ First Action: The user opens the music player and selects a song they want to li
 Feedback: The selected song appears on the screen, and the user can press Play to start listening.
 Recovery: If the song does not play, the player displays a simple error message and lets the user select another song.
 
-
 2. Action — Help the user understand how it works
 Stage 2: Action
 First Action: The user presses Play or Pause to control the music.
