@@ -1,0 +1,22 @@
+CS110 WEEK 8 / GUILD TEAM LEAD CONTRACT
+
+Team: Awayzo
+Team Lead: Lexxie
+Members: Lexxie
+Paulina
+Nicolas
+Rudy
+Term: The contract lasts from Action 8A through the accepted Week 8 release.
+
+DUTIES
+1. Maintain the shared GitHub repository and approved access.
+2. Track tasks, checkpoints, unknowns and individual contributions.
+3. Protect the final release: source, documentation, evidence, receipt and tested link.
+
+BOUNDARY
+The Team Lead coordinates. The lead does not collect passwords or complete every member's work.
+
+AWARD
+After instructor verification, the contracted Team Lead receives five stickers and one guild card. The award does not replace a grade requirement.
+
+The instructor verifies fulfillment. This contract is not a grade or attendance receipt.
