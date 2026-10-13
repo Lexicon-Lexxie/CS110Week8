@@ -1,0 +1,1 @@
+Add your approved files here. Keep their sources in Evidence/image-sources.txt.
