@@ -1,20 +1,24 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\Lexxie Ayala\\Downloads\\MusicReferenceHub\\MusicReferenceHub.csproj": {}
+    "C:\\Users\\B220\\Downloads\\CS110Week8-main\\MusicReferenceHub\\MusicReferenceHub.csproj": {}
   },
   "projects": {
-    "C:\\Users\\Lexxie Ayala\\Downloads\\MusicReferenceHub\\MusicReferenceHub.csproj": {
+    "C:\\Users\\B220\\Downloads\\CS110Week8-main\\MusicReferenceHub\\MusicReferenceHub.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\Lexxie Ayala\\Downloads\\MusicReferenceHub\\MusicReferenceHub.csproj",
+        "projectUniqueName": "C:\\Users\\B220\\Downloads\\CS110Week8-main\\MusicReferenceHub\\MusicReferenceHub.csproj",
         "projectName": "MusicReferenceHub",
-        "projectPath": "C:\\Users\\Lexxie Ayala\\Downloads\\MusicReferenceHub\\MusicReferenceHub.csproj",
-        "packagesPath": "C:\\Users\\Lexxie Ayala\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\Lexxie Ayala\\Downloads\\MusicReferenceHub\\obj\\",
+        "projectPath": "C:\\Users\\B220\\Downloads\\CS110Week8-main\\MusicReferenceHub\\MusicReferenceHub.csproj",
+        "packagesPath": "C:\\Users\\B220\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\B220\\Downloads\\CS110Week8-main\\MusicReferenceHub\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "C:\\Users\\Lexxie Ayala\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\B220\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -22,11 +26,11 @@
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0-windows": {
-            "framework": "net8.0-windows7.0",
+          "net8.0-windows7.0": {
             "targetAlias": "net8.0-windows",
             "projectReferences": {}
           }
@@ -41,11 +45,10 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.400"
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
-        "net8.0-windows": {
-          "framework": "net8.0-windows7.0",
+        "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "dependencies": {
             "NAudio": {
@@ -64,24 +67,6 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
-          "downloadDependencies": [
-            {
-              "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.31, 8.0.31]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Host.win-x64",
-              "version": "[8.0.31, 8.0.31]"
-            },
-            {
-              "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.31, 8.0.31]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.31, 8.0.31]"
-            }
-          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
@@ -90,7 +75,7 @@
               "privateAssets": "none"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.401/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.318/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

@@ -591,37 +591,140 @@ public partial class MainWindow : Window
 
     private void AddLink_Click(object sender, RoutedEventArgs e)
     {
-        // TODO (Links chapter): Implement AddLink in the matching tutorial chapter.
-        // Replace this placeholder with the handler shown in that chapter.
-        txtStatus.Text = "AddLink_Click: behavior still to build.";
+        try
+        {
+            var url = (txtLink.Text ?? "").Trim();
+            if (string.IsNullOrEmpty(url))
+            {
+                txtStatus.Text = "Enter a URL to add.";
+                return;
+            }
+
+            // Ensure a scheme so Process.Start works reliably
+            if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                url = "https://" + url;
+            }
+
+            lstLinks.Items.Add(url);
+            txtLink.Text = "";
+            txtStatus.Text = "Link added: " + url;
+        }
+        catch (Exception ex)
+        {
+            txtStatus.Text = "Failed to add link: " + ex.Message;
+        }
     }
 
     private void OpenLink_Click(object sender, RoutedEventArgs e)
     {
-        // TODO (Links chapter): Implement OpenLink in the matching tutorial chapter.
-        // Replace this placeholder with the handler shown in that chapter.
-        txtStatus.Text = "OpenLink_Click: behavior still to build.";
+        try
+        {
+            if (lstLinks.SelectedItem is not string link)
+            {
+                txtStatus.Text = "No link selected.";
+                return;
+            }
+
+            var psi = new System.Diagnostics.ProcessStartInfo(link)
+            {
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
+            txtStatus.Text = "Opened link: " + link;
+        }
+        catch (Exception ex)
+        {
+            txtStatus.Text = "Failed to open link: " + ex.Message;
+        }
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        // TODO (Text files chapter): Implement Save in the matching tutorial chapter.
-        // Replace this placeholder with the handler shown in that chapter.
-        txtStatus.Text = "Save_Click: behavior still to build.";
+        try
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "Text files|*.txt|All files|*.*",
+                FileName = "notes.txt",
+                DefaultExt = ".txt"
+            };
+
+            if (dlg.ShowDialog(this) == true)
+            {
+                File.WriteAllText(dlg.FileName, txtNotes.Text ?? "");
+                txtStatus.Text = "Notes exported to: " + dlg.FileName;
+            }
+            else
+            {
+                txtStatus.Text = "Export cancelled.";
+            }
+        }
+        catch (Exception ex)
+        {
+            txtStatus.Text = "Save failed: " + ex.Message;
+        }
     }
 
     private void Open_Click(object sender, RoutedEventArgs e)
     {
-        // TODO (Text files chapter): Implement Open in the matching tutorial chapter.
-        // Replace this placeholder with the handler shown in that chapter.
-        txtStatus.Text = "Open_Click: behavior still to build.";
+        try
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Text files|*.txt|All files|*.*",
+                DefaultExt = ".txt",
+                Multiselect = false
+            };
+
+            if (dlg.ShowDialog(this) == true)
+            {
+                txtNotes.Text = File.ReadAllText(dlg.FileName);
+                txtStatus.Text = "Notes loaded: " + dlg.FileName;
+            }
+            else
+            {
+                txtStatus.Text = "Reopen cancelled.";
+            }
+        }
+        catch (Exception ex)
+        {
+            txtStatus.Text = "Open failed: " + ex.Message;
+        }
     }
 
     private void Image_Click(object sender, RoutedEventArgs e)
     {
-        // TODO (Artwork chapter): Implement Image in the matching tutorial chapter.
-        // Replace this placeholder with the handler shown in that chapter.
-        txtStatus.Text = "Image_Click: behavior still to build.";
+        try
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif|All files|*.*",
+                Multiselect = false
+            };
+
+            if (dlg.ShowDialog(this) == true)
+            {
+                var uri = new Uri(dlg.FileName);
+                var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = uri;
+                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                imgArtwork.Source = bmp;
+                try { imgButton.Source = bmp; } catch { }
+                txtStatus.Text = "Artwork set: " + dlg.FileName;
+            }
+            else
+            {
+                txtStatus.Text = "Choose artwork cancelled.";
+            }
+        }
+        catch (Exception ex)
+        {
+            txtStatus.Text = "Failed to set artwork: " + ex.Message;
+        }
     }
 
     // ---------- Media events and playlist navigation ----------
