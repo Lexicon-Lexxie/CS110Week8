@@ -1,0 +1,391 @@
+using System;
+using System.IO;
+using NAudio.Dsp;
+using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
+
+namespace MusicReferenceHub;
+
+/// <summary>
+/// NAudio-based player: file reader -> 10-band peaking EQ + preamp -> volume/balance -> sound card.
+/// It also keeps a short ring of recent samples so the window can draw a real spectrum analyzer.
+/// </summary>
+public sealed class AudioEngine : IDisposable
+{
+    public const int BandCount = 10;
+    public static readonly double[] BandFrequencies = { 60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000 };
+    private const float BandQ = 1.2f;
+    private const int FftSize = 1024;   // must be a power of two
+
+    private readonly object _sync = new();
+    private readonly double[] _gains = new double[BandCount];
+    private readonly float[] _fftRe = new float[FftSize];
+    private readonly float[] _fftIm = new float[FftSize];
+    private static readonly float[] Hann = MakeHann();
+
+    private AudioFileReader? _reader;
+    private ProcessingChain? _chain;
+    private WaveOutEvent? _output;
+    private EventHandler<StoppedEventArgs>? _stoppedHandler;
+
+    private volatile bool _eqEnabled = true;
+    private float _volume = 0.35f;
+    private float _balance;
+    private float _preampGain = 1f;
+
+    /// <summary>Raised on the UI thread when a track plays all the way to its end.</summary>
+    public event EventHandler? TrackEnded;
+    /// <summary>Raised on the UI thread when the sound device or decoder fails mid-playback.</summary>
+    public event EventHandler<Exception>? PlaybackFailed;
+
+    public string? CurrentPath { get; private set; }
+    public int BitrateKbps { get; private set; }
+    public int SampleRate => _reader?.WaveFormat.SampleRate ?? 0;
+    public int Channels => _reader?.WaveFormat.Channels ?? 0;
+    public bool HasTrack => _reader != null;
+    public bool IsPlaying => _output?.PlaybackState == PlaybackState.Playing;
+    public TimeSpan TotalTime => _reader?.TotalTime ?? TimeSpan.Zero;
+
+    public TimeSpan Position
+    {
+        get => _reader?.CurrentTime ?? TimeSpan.Zero;
+        set
+        {
+            lock (_sync)
+            {
+                if (_reader == null) return;
+                if (value < TimeSpan.Zero) value = TimeSpan.Zero;
+                if (value > _reader.TotalTime) value = _reader.TotalTime;
+                _reader.CurrentTime = value;
+            }
+        }
+    }
+
+    /// <summary>0..1</summary>
+    public double Volume
+    {
+        get => _volume;
+        set => _volume = (float)Math.Clamp(value, 0, 1);
+    }
+
+    /// <summary>-1 (left) .. +1 (right)</summary>
+    public double Balance
+    {
+        get => _balance;
+        set => _balance = (float)Math.Clamp(value, -1, 1);
+    }
+
+    public bool EqEnabled
+    {
+        get => _eqEnabled;
+        set => _eqEnabled = value;
+    }
+
+    /// <summary>Preamp in dB (-12..+12)</summary>
+    public double PreampDb
+    {
+        set => _preampGain = (float)Math.Pow(10, Math.Clamp(value, -12, 12) / 20.0);
+    }
+
+    public void SetBand(int index, double db)
+    {
+        if (index < 0 || index >= BandCount) return;
+        db = Math.Clamp(db, -12, 12);
+        lock (_sync)
+        {
+            _gains[index] = db;
+            _chain?.UpdateBand(index, (float)db);
+        }
+    }
+
+    /// <summary>Opens a file (replacing any current one). Throws if the format is not supported.</summary>
+    public void Load(string path)
+    {
+        CloseTrack();
+        var reader = new AudioFileReader(path);
+        try
+        {
+            ISampleProvider source = reader;
+            if (reader.WaveFormat.Channels == 1) source = new MonoToStereoSampleProvider(source);
+            var chain = new ProcessingChain(this, source);
+            lock (_sync)
+            {
+                for (int i = 0; i < BandCount; i++) chain.UpdateBand(i, (float)_gains[i]);
+                _reader = reader;
+                _chain = chain;
+            }
+            CurrentPath = path;
+            try
+            {
+                double secs = reader.TotalTime.TotalSeconds;
+                BitrateKbps = secs > 0 ? (int)Math.Round(new FileInfo(path).Length * 8 / secs / 1000) : 0;
+            }
+            catch { BitrateKbps = 0; }
+        }
+        catch
+        {
+            reader.Dispose();
+            throw;
+        }
+    }
+
+    public void Play()
+    {
+        if (_reader == null || _chain == null) return;
+        EnsureOutput();
+        _output!.PlaybackStopped -= _stoppedHandler;
+        _output.PlaybackStopped += _stoppedHandler;
+        _output.Play();
+    }
+
+    public void Pause()
+    {
+        _output?.Pause();
+    }
+
+    /// <summary>Stops and rewinds to the start (like Winamp's Stop button).</summary>
+    public void Stop()
+    {
+        DestroyOutput();
+        Position = TimeSpan.Zero;
+    }
+
+    /// <summary>Stops playback and closes the current file.</summary>
+    public void Unload() => CloseTrack();
+
+    private void EnsureOutput()
+    {
+        if (_output != null) return;
+        // created on the UI thread, so PlaybackStopped is raised on the UI thread too
+        var output = new WaveOutEvent { DesiredLatency = 150 };
+        output.Init(new SampleToWaveProvider(_chain!));
+        _output = output;
+        _stoppedHandler ??= OnPlaybackStopped;
+    }
+
+    private void OnPlaybackStopped(object? sender, StoppedEventArgs e)
+    {
+        if (!ReferenceEquals(sender, _output)) return;
+        if (e.Exception != null)
+        {
+            PlaybackFailed?.Invoke(this, e.Exception);
+            return;
+        }
+        // reached the end of the file
+        DestroyOutput();
+        Position = TimeSpan.Zero;
+        TrackEnded?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void DestroyOutput()
+    {
+        var output = _output;
+        _output = null;
+        if (output == null) return;
+        if (_stoppedHandler != null) output.PlaybackStopped -= _stoppedHandler;
+        try { output.Stop(); } catch { }
+        try { output.Dispose(); } catch { }
+    }
+
+    private void CloseTrack()
+    {
+        DestroyOutput();
+        lock (_sync) { _chain = null; }
+        _reader?.Dispose();
+        _reader = null;
+        CurrentPath = null;
+    }
+
+    public void Dispose()
+    {
+        CloseTrack();
+    }
+
+    // ---------------- Spectrum analyzer ----------------
+
+    /// <summary>
+    /// Returns one height (0..16 pixels) per bar, log-spaced from about 50 Hz to 16 kHz,
+    /// computed from the most recent audio that was sent to the sound card.
+    /// </summary>
+    public float[] GetSpectrum(int bars)
+    {
+        var result = new float[bars];
+        var chain = _chain;
+        if (chain == null || !IsPlaying) return result;
+
+        chain.CopyRecent(_fftRe);
+        for (int i = 0; i < FftSize; i++) { _fftRe[i] *= Hann[i]; _fftIm[i] = 0; }
+        Fft(_fftRe, _fftIm);
+
+        double rate = chain.WaveFormat.SampleRate;
+        double binHz = rate / FftSize;
+        double fMin = 50, fMax = Math.Min(16000, rate / 2 - binHz);
+        for (int b = 0; b < bars; b++)
+        {
+            double lo = fMin * Math.Pow(fMax / fMin, (double)b / bars);
+            double hi = fMin * Math.Pow(fMax / fMin, (double)(b + 1) / bars);
+            int k0 = Math.Max(1, (int)Math.Floor(lo / binHz));
+            int k1 = Math.Max(k0, (int)Math.Floor(hi / binHz));
+            double peak = 0;
+            for (int k = k0; k <= k1 && k < FftSize / 2; k++)
+            {
+                double mag = Math.Sqrt(_fftRe[k] * _fftRe[k] + _fftIm[k] * _fftIm[k]);
+                if (mag > peak) peak = mag;
+            }
+            double amp = 4.0 * peak / FftSize;                       // ~ sine amplitude (Hann window)
+            double db = 20 * Math.Log10(amp + 1e-6);
+            db += 2.0 * Math.Log2(Math.Sqrt(lo * hi) / 100.0);       // gentle tilt so treble bars are visible
+            result[b] = (float)Math.Clamp((db + 55) / 40.0 * 16.0, 0, 16);
+        }
+        return result;
+    }
+
+    private readonly float[] _scopeBuf = new float[FftSize];
+
+    /// <summary>Recent waveform samples (-1..1) for the oscilloscope visualization.</summary>
+    public float[] GetWaveform(int points)
+    {
+        var result = new float[points];
+        var chain = _chain;
+        if (chain == null || !IsPlaying) return result;
+        chain.CopyRecent(_scopeBuf);
+        const int span = 576;
+        int start = FftSize - span;
+        for (int i = 0; i < points; i++) result[i] = _scopeBuf[start + i * span / points];
+        return result;
+    }
+
+    private static float[] MakeHann()
+    {
+        var w = new float[FftSize];
+        for (int i = 0; i < FftSize; i++) w[i] = (float)(0.5 - 0.5 * Math.Cos(2 * Math.PI * i / (FftSize - 1)));
+        return w;
+    }
+
+    private static void Fft(float[] re, float[] im)
+    {
+        int n = re.Length;
+        for (int i = 1, j = 0; i < n; i++)
+        {
+            int bit = n >> 1;
+            for (; (j & bit) != 0; bit >>= 1) j ^= bit;
+            j ^= bit;
+            if (i < j)
+            {
+                (re[i], re[j]) = (re[j], re[i]);
+                (im[i], im[j]) = (im[j], im[i]);
+            }
+        }
+        for (int len = 2; len <= n; len <<= 1)
+        {
+            double ang = -2 * Math.PI / len;
+            float wlr = (float)Math.Cos(ang), wli = (float)Math.Sin(ang);
+            for (int i = 0; i < n; i += len)
+            {
+                float wr = 1, wi = 0;
+                for (int k = 0; k < len / 2; k++)
+                {
+                    int u = i + k, v = i + k + len / 2;
+                    float xr = re[v] * wr - im[v] * wi;
+                    float xi = re[v] * wi + im[v] * wr;
+                    re[v] = re[u] - xr; im[v] = im[u] - xi;
+                    re[u] += xr; im[u] += xi;
+                    float nwr = wr * wlr - wi * wli;
+                    wi = wr * wli + wi * wlr;
+                    wr = nwr;
+                }
+            }
+        }
+    }
+
+    // ---------------- Audio processing chain ----------------
+
+    private sealed class ProcessingChain : ISampleProvider
+    {
+        private readonly AudioEngine _owner;
+        private readonly ISampleProvider _source;
+        private readonly BiQuadFilter?[][] _filters;   // [channel][band]
+        private readonly float[] _ring = new float[FftSize];
+        private int _ringPos;
+
+        public ProcessingChain(AudioEngine owner, ISampleProvider source)
+        {
+            _owner = owner;
+            _source = source;
+            int channels = source.WaveFormat.Channels;
+            _filters = new BiQuadFilter?[channels][];
+            for (int c = 0; c < channels; c++)
+            {
+                _filters[c] = new BiQuadFilter?[BandCount];
+                for (int b = 0; b < BandCount; b++) UpdateBandForChannel(c, b, 0f);
+            }
+        }
+
+        public WaveFormat WaveFormat => _source.WaveFormat;
+
+        public void UpdateBand(int band, float db)
+        {
+            for (int c = 0; c < _filters.Length; c++) UpdateBandForChannel(c, band, db);
+        }
+
+        private void UpdateBandForChannel(int channel, int band, float db)
+        {
+            float rate = WaveFormat.SampleRate;
+            float freq = (float)BandFrequencies[band];
+            if (freq >= rate * 0.45f) { _filters[channel][band] = null; return; }   // band is above what this file can contain
+            var f = _filters[channel][band];
+            if (f == null) _filters[channel][band] = BiQuadFilter.PeakingEQ(rate, freq, BandQ, db);
+            else f.SetPeakingEq(rate, freq, BandQ, db);
+        }
+
+        public int Read(float[] buffer, int offset, int count)
+        {
+            lock (_owner._sync)
+            {
+                int read = _source.Read(buffer, offset, count);
+                int channels = _filters.Length;
+                bool eq = _owner._eqEnabled;
+                float pre = _owner._preampGain;
+                float vol = _owner._volume;
+                float bal = _owner._balance;
+                float left = bal > 0 ? 1 - bal : 1;
+                float right = bal < 0 ? 1 + bal : 1;
+
+                for (int i = 0; i < read; i++)
+                {
+                    int ch = i % channels;
+                    float s = buffer[offset + i];
+                    if (eq)
+                    {
+                        s *= pre;
+                        var bands = _filters[ch];
+                        for (int b = 0; b < BandCount; b++)
+                        {
+                            var f = bands[b];
+                            if (f != null) s = f.Transform(s);
+                        }
+                    }
+                    if (s > 1f) s = 1f; else if (s < -1f) s = -1f;
+
+                    if (ch == 0)
+                    {
+                        _ring[_ringPos] = s;
+                        _ringPos = (_ringPos + 1) & (FftSize - 1);
+                    }
+
+                    s *= vol;
+                    if (channels == 2) s *= ch == 0 ? left : right;
+                    buffer[offset + i] = s;
+                }
+                return read;
+            }
+        }
+
+        /// <summary>Copies the most recent FftSize mono samples (oldest first).</summary>
+        public void CopyRecent(float[] dest)
+        {
+            int pos = _ringPos;
+            for (int i = 0; i < FftSize; i++) dest[i] = _ring[(pos + i) & (FftSize - 1)];
+        }
+    }
+}

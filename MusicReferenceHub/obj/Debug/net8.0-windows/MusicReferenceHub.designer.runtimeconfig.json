@@ -12,9 +12,8 @@
       }
     ],
     "additionalProbingPaths": [
-      "C:\\Users\\B217\\.dotnet\\store\\|arch|\\|tfm|",
-      "C:\\Users\\B217\\.nuget\\packages",
-      "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+      "C:\\Users\\Lexxie Ayala\\.dotnet\\store\\|arch|\\|tfm|",
+      "C:\\Users\\Lexxie Ayala\\.nuget\\packages"
     ],
     "configProperties": {
       "CSWINRT_USE_WINDOWS_UI_XAML_PROJECTIONS": false,
