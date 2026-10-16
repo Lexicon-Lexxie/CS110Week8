@@ -22,7 +22,3 @@ A simple Windows music player where you can play songs, save reference links, an
 
 **R7 (Submit the tested GitHub link):** You can find our Week 8 route receipt (`CS110-W8-MUSIC-Route Selection.pdf`) in the main folder and in the `8A` folder inside the `Evidence` folder.
 
-## How to run it
-
-Open `MusicReferenceHub.sln` (inside the `MusicReferenceHub` folder) in Visual Studio and press F5.
-Or unzip `MusicReferenceHub-Release.zip` and run `MusicReferenceHub.exe`.
