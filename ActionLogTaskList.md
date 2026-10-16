@@ -100,6 +100,7 @@ Week8/                                  <-- REPOSITORY ROOT
 * [ ] **8A**: Draft `Context.md` covering the user persona, need, limits, privacy boundaries, assumptions, and SEEK/AAA principles.
 * [ ] **8A**: Update contextual subtitles in `MainWindow.xaml` to match the chosen user scenario.
 * [ ] **8B**: Record Day 8A/8B lecture notes and log Day 1 unknowns at the top of `TestNotes.md`.
+* [ ] **8B**: Required AI Check.
 * [ ] **Final**: Write `PATTERN.md` detailing where the pattern appears, why it works, and how to adapt it.
 * [ ] **Final**: Complete root `README.md` (User, Problem, Controls table, Event Flow, Setup, Known Limits, Next Step, Contributions).
 * [ ] **Final**: Verify the Week 8 route receipt is saved in `Evidence/Final/`.
